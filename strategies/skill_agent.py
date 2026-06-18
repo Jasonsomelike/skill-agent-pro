@@ -7,8 +7,10 @@ This strategy combines three capability sources:
 3. Dify tools selected in the Agent node.
 """
 
+import ast
 import json
 import os
+import re
 import tempfile
 import time
 from pathlib import Path
@@ -102,6 +104,18 @@ When using tools:
 2. Call tools with appropriate parameters.
 3. Use tool results to continue the task, not as the final answer by default.
 4. If a tool fails, explain the issue and try a reasonable alternative.
+
+When a knowledge-base tool returns source metadata or page images:
+1. Preserve the exact document_name in the final answer. Do not shorten a
+   split filename to a generic book title.
+2. Read the page number from Markdown labels such as "Page 18" or URLs such
+   as "page_18.jpg".
+3. For filenames ending in "_partN_pA-B.pdf", report both the split-file page
+   N and the original PDF page A + N - 1. Do not call that calculated PDF page
+   the printed textbook page.
+4. Copy returned /page-images/ URLs exactly into standard Markdown image
+   syntax. Do not omit the image, output only a bare URL, or replace it with
+   an illustration from inside the page.
 
 Installed skill packages may include reference files and scripts. Use the
 skill_* tools to inspect those packages only when the active skill instructions
@@ -961,6 +975,230 @@ When long-term memory tools are available:
             return "Tool returned a file/blob."
         return str(message)
 
+    def _split_document_page(
+        self,
+        document_name: str,
+        local_page: int,
+    ) -> tuple[Optional[int], Optional[int], Optional[int]]:
+        match = re.search(
+            r"_part\d+_p(?P<start>\d+)-(?P<end>\d+)\.pdf$",
+            document_name,
+            flags=re.IGNORECASE,
+        )
+        if match is None:
+            return None, None, None
+
+        start_page = int(match.group("start"))
+        end_page = int(match.group("end"))
+        original_pdf_page = start_page + local_page - 1
+        if original_pdf_page > end_page:
+            return start_page, end_page, None
+        return start_page, end_page, original_pdf_page
+
+    def _extract_knowledge_citations(self, tool_result: str) -> list[dict[str, Any]]:
+        if not tool_result:
+            return []
+
+        citations: list[dict[str, Any]] = []
+        seen_urls: set[str] = set()
+        for record in self._knowledge_result_records(tool_result):
+            document_name = self._find_nested_string(record, "document_name")
+            content = self._find_nested_string(record, "content")
+            if not content:
+                continue
+
+            image_matches = re.finditer(
+                r"""!\[(?P<label>[^\]]*)\]\((?P<url>https?://[^)\s]+/page_(?P<url_page>\d+)\.(?:jpg|jpeg|png|webp))\)""",
+                content,
+                flags=re.IGNORECASE,
+            )
+            for image_match in image_matches:
+                url = image_match.group("url")
+                if url in seen_urls:
+                    continue
+                seen_urls.add(url)
+
+                label_match = re.search(
+                    r"\bPage\s*(\d+)\b",
+                    image_match.group("label"),
+                    flags=re.IGNORECASE,
+                )
+                local_page = (
+                    int(label_match.group(1))
+                    if label_match
+                    else int(image_match.group("url_page"))
+                )
+                start_page, end_page, original_pdf_page = self._split_document_page(
+                    document_name,
+                    local_page,
+                )
+                citations.append(
+                    {
+                        "document_name": document_name,
+                        "local_page": local_page,
+                        "original_pdf_page": original_pdf_page,
+                        "split_start_page": start_page,
+                        "split_end_page": end_page,
+                        "image_url": url,
+                    }
+                )
+        return citations
+
+    def _knowledge_result_records(self, tool_result: str) -> list[dict[str, Any]]:
+        candidates: list[Any] = []
+        stripped = tool_result.strip()
+
+        try:
+            candidates.append(json.loads(stripped))
+        except (TypeError, ValueError, json.JSONDecodeError):
+            pass
+
+        marker = "variable_value="
+        if marker in stripped:
+            literal_text = stripped.split(marker, 1)[1].strip()
+            try:
+                candidates.append(ast.literal_eval(literal_text))
+            except (SyntaxError, ValueError):
+                pass
+
+        records: list[dict[str, Any]] = []
+
+        def collect(value: Any) -> None:
+            if isinstance(value, dict):
+                if self._find_nested_string(value, "content") and self._find_nested_string(
+                    value,
+                    "document_name",
+                ):
+                    records.append(value)
+                    return
+                for nested in value.values():
+                    collect(nested)
+            elif isinstance(value, list):
+                for nested in value:
+                    collect(nested)
+            elif isinstance(value, str) and marker in value:
+                nested_literal = value.split(marker, 1)[1].strip()
+                try:
+                    collect(ast.literal_eval(nested_literal))
+                except (SyntaxError, ValueError):
+                    return
+
+        for candidate in candidates:
+            collect(candidate)
+
+        if records:
+            return records
+
+        for block_match in re.finditer(
+            r"\{[^{}]*?['\"]content['\"]\s*:\s*(?P<content>.+?)"
+            r"['\"]document_name['\"]\s*:\s*['\"](?P<document>[^'\"]+)['\"][^{}]*?\}",
+            stripped,
+            flags=re.IGNORECASE | re.DOTALL,
+        ):
+            records.append(
+                {
+                    "content": block_match.group("content"),
+                    "document_name": block_match.group("document"),
+                }
+            )
+        return records
+
+    def _find_nested_string(self, value: Any, target_key: str) -> str:
+        if isinstance(value, dict):
+            direct = value.get(target_key)
+            if isinstance(direct, str) and direct.strip():
+                return direct.strip()
+            for nested in value.values():
+                found = self._find_nested_string(nested, target_key)
+                if found:
+                    return found
+        elif isinstance(value, list):
+            for nested in value:
+                found = self._find_nested_string(nested, target_key)
+                if found:
+                    return found
+        return ""
+
+    def _merge_knowledge_citations(
+        self,
+        existing: list[dict[str, Any]],
+        incoming: list[dict[str, Any]],
+    ) -> None:
+        known_urls = {str(item.get("image_url") or "") for item in existing}
+        for citation in incoming:
+            url = str(citation.get("image_url") or "")
+            if not url or url in known_urls:
+                continue
+            existing.append(citation)
+            known_urls.add(url)
+
+    def _knowledge_citation_hint(self, citations: list[dict[str, Any]]) -> str:
+        if not citations:
+            return ""
+
+        lines = [
+            "",
+            "[Knowledge citation normalization]",
+            "The final answer must preserve these exact source files and page images:",
+        ]
+        for citation in citations:
+            document_name = str(citation.get("document_name") or "document_name 未提供")
+            local_page = int(citation["local_page"])
+            original_pdf_page = citation.get("original_pdf_page")
+            if original_pdf_page is None:
+                page_text = f"第 {local_page} 页"
+            else:
+                page_text = f"原 PDF 第 {original_pdf_page} 页（分卷内第 {local_page} 页）"
+            lines.append(
+                f"- 文件：{document_name}；页码：{page_text}；"
+                f"整页图片：{citation['image_url']}"
+            )
+        return "\n".join(lines)
+
+    def _missing_knowledge_citation_appendix(
+        self,
+        response_text: str,
+        citations: list[dict[str, Any]],
+        max_images: int = 3,
+    ) -> str:
+        if not citations:
+            return ""
+
+        blocks = []
+        for citation in citations[: max(1, max_images)]:
+            document_name = str(citation.get("document_name") or "document_name 未提供")
+            image_url = str(citation.get("image_url") or "")
+            local_page = int(citation["local_page"])
+            original_pdf_page = citation.get("original_pdf_page")
+
+            has_exact_document = document_name in response_text
+            has_image = image_url in response_text
+            if has_exact_document and has_image:
+                continue
+
+            lines = [f"来源文件：`{document_name}`"]
+            if original_pdf_page is None:
+                lines.append(f"来源页码：第 {local_page} 页")
+                image_page_label = f"第 {local_page} 页"
+            else:
+                lines.append(
+                    f"来源页码：原 PDF 第 {original_pdf_page} 页"
+                    f"（分卷内第 {local_page} 页）"
+                )
+                image_page_label = (
+                    f"原 PDF 第 {original_pdf_page} 页，分卷内第 {local_page} 页"
+                )
+
+            if not has_image:
+                lines.append(
+                    f"![{document_name} {image_page_label}原页]({image_url})"
+                )
+            blocks.append("\n".join(lines))
+
+        if not blocks:
+            return ""
+        return "\n\n## 知识库来源原页\n\n" + "\n\n".join(blocks)
+
     def _execute_internal_tool(
         self,
         *,
@@ -1293,6 +1531,7 @@ When long-term memory tools are available:
 
             iteration = 0
             exported_paths: set[str] = set()
+            knowledge_citations: list[dict[str, Any]] = []
             finished_normally = False
             while iteration < params.maximum_iterations:
                 iteration += 1
@@ -1360,6 +1599,12 @@ When long-term memory tools are available:
                     )
 
                     if not tool_calls:
+                        citation_appendix = self._missing_knowledge_citation_appendix(
+                            response_text,
+                            knowledge_citations,
+                        )
+                        if citation_appendix:
+                            yield self.create_text_message(citation_appendix)
                         finished_normally = True
                         yield self.finish_log_message(
                             log=iteration_log,
@@ -1427,6 +1672,13 @@ When long-term memory tools are available:
                                     if text:
                                         tool_result_parts.append(text)
                                 tool_result = "\n".join(tool_result_parts) or "Tool executed successfully."
+                                if tool_name == "getKonwledgeBase":
+                                    new_citations = self._extract_knowledge_citations(tool_result)
+                                    self._merge_knowledge_citations(
+                                        knowledge_citations,
+                                        new_citations,
+                                    )
+                                    tool_result += self._knowledge_citation_hint(new_citations)
 
                             yield self.finish_log_message(
                                 log=tool_log,

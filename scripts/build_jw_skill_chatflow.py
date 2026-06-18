@@ -10,8 +10,8 @@ import yaml
 
 
 LOCAL_PLUGIN = (
-    "local/agent-skill-plugin-plus:1.5.1@"
-    "831a912c4b5028dc0e313023487b7c67c95684feba47dc1cf230081b38275ef9"
+    "local/agent-skill-plugin-plus:1.5.3@"
+    "59585d776901ad3ac11835dab6d8f267c31d26f5e08219e3e32aad0503c2afa5"
 )
 DEEPSEEK_PLUGIN = (
     "langgenius/deepseek:0.0.15@"
@@ -46,7 +46,7 @@ def dependency(plugin_identifier: str, *, local_package: bool = False) -> dict:
             "type": "package",
             "value": {
                 "plugin_unique_identifier": plugin_identifier,
-                "version": "1.5.1",
+                "version": "1.5.3",
             },
         }
     return {
@@ -205,7 +205,7 @@ def build_agent_node(source_nodes: list[dict]) -> dict:
         },
             "meta": {
                 "minimum_dify_version": "1.7.0",
-                "version": "1.5.1",
+                "version": "1.5.3",
             },
         "output_schema": {},
         "plugin_unique_identifier": LOCAL_PLUGIN,
@@ -354,6 +354,7 @@ def main() -> None:
     args.output.write_text(
         yaml.safe_dump(output, allow_unicode=True, sort_keys=False, width=120),
         encoding="utf-8",
+        newline="\n",
     )
     print(args.output)
 

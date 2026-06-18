@@ -10,8 +10,8 @@ dependencies:
 - current_identifier: null
   type: package
   value:
-    plugin_unique_identifier: local/agent-skill-plugin-plus:1.5.1@831a912c4b5028dc0e313023487b7c67c95684feba47dc1cf230081b38275ef9
-    version: 1.5.1
+    plugin_unique_identifier: local/agent-skill-plugin-plus:1.5.3@59585d776901ad3ac11835dab6d8f267c31d26f5e08219e3e32aad0503c2afa5
+    version: 1.5.3
 - current_identifier: null
   type: marketplace
   value:
@@ -602,9 +602,9 @@ workflow:
             size: 30
         meta:
           minimum_dify_version: 1.7.0
-          version: 1.5.1
+          version: 1.5.3
         output_schema: {}
-        plugin_unique_identifier: local/agent-skill-plugin-plus:1.5.1@831a912c4b5028dc0e313023487b7c67c95684feba47dc1cf230081b38275ef9
+        plugin_unique_identifier: local/agent-skill-plugin-plus:1.5.3@59585d776901ad3ac11835dab6d8f267c31d26f5e08219e3e32aad0503c2afa5
         selected: false
         title: Skill 学习 Agent
         tool_node_version: '2'
