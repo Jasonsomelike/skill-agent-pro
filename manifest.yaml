@@ -1,4 +1,4 @@
-version: 1.5.0
+version: 1.5.1
 type: plugin
 author: local
 name: agent-skill-plugin-plus
@@ -29,7 +29,7 @@ resource:
       enabled: true
       size: 104857600
 meta:
-  version: 1.5.0
+  version: 1.5.1
   arch:
     - amd64
     - arm64

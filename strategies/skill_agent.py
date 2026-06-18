@@ -113,6 +113,12 @@ spreadsheet, presentation, PDF, archive, image, or other file-generation tasks,
 create the real file and call runtime_export_file so Dify returns it as an
 attachment. Do not merely print source code when the requested file can be
 generated in the workspace.
+
+When long-term memory tools are available:
+1. Use the runtime-bound user_id. Do not ask the user to repeat it.
+2. Read memory before answering explicit questions about what was saved,
+   remembered, updated, or missing.
+3. Only say something was saved or updated after the tool result confirms it.
 """
 
     INTERNAL_TOOL_NAMES = {
@@ -475,37 +481,139 @@ generated in the workspace.
         return header + "\n\n---\n\n".join(prompts), selected_names
 
     def _message_text(self, message: Any) -> str:
-        content = self._safe_get(message, "content", default="")
+        content = self._safe_get(message, "content", default=message)
         if isinstance(content, str):
             return content
         if isinstance(content, list):
             parts = []
             for item in content:
-                text = self._safe_get(item, "data", default=None)
-                if text is None:
-                    text = self._safe_get(item, "text", default=None)
+                text = self._message_content_text(item)
                 if text:
-                    parts.append(str(text))
-            return "".join(parts)
+                    parts.append(text)
+            return "\n".join(parts)
+        if isinstance(content, dict):
+            text = self._message_content_text(content)
+            if text:
+                return text
         return str(content or "")
 
+    def _truncate_text(self, value: Any, limit: int = 180) -> str:
+        text = " ".join(str(value or "").split())
+        if len(text) <= limit:
+            return text
+        return text[: max(1, limit - 1)] + "…"
+
+    def _message_attachment_text(
+        self,
+        content_type: str,
+        *,
+        filename: str = "",
+        mime_type: str = "",
+        url: str = "",
+    ) -> str:
+        label = str(content_type or "content").strip().lower()
+        details = []
+        if filename:
+            details.append(filename)
+        elif mime_type:
+            details.append(mime_type)
+
+        normalized_url = str(url or "").strip()
+        if normalized_url and not normalized_url.startswith("data:"):
+            details.append(self._truncate_text(normalized_url, limit=120))
+
+        if details:
+            return f"[{label}: {' | '.join(details)}]"
+        return f"[{label}]"
+
+    def _message_content_text(self, item: Any) -> str:
+        if item is None:
+            return ""
+        if isinstance(item, str):
+            return item
+
+        content_type = self._safe_get(item, "type", default="")
+        content_type = str(getattr(content_type, "value", content_type) or "").lower()
+
+        text = self._safe_get(item, "data", default=None)
+        if text is None:
+            text = self._safe_get(item, "text", default=None)
+        if text and content_type in {"", "text"}:
+            return str(text)
+
+        if isinstance(item, dict) and not content_type:
+            raw_content = item.get("content")
+            if isinstance(raw_content, str):
+                return raw_content
+
+        filename = str(self._safe_get(item, "filename", default="") or "").strip()
+        mime_type = str(self._safe_get(item, "mime_type", default="") or "").strip()
+        url = str(self._safe_get(item, "url", default="") or "").strip()
+        if url.startswith("data:"):
+            url = ""
+
+        if text and not content_type:
+            return str(text)
+
+        label = content_type
+        if not label:
+            label = item.__class__.__name__
+            for suffix in ("PromptMessageContent", "MessageContent", "Content"):
+                if label.endswith(suffix):
+                    label = label[: -len(suffix)]
+                    break
+            label = label or "content"
+
+        return self._message_attachment_text(
+            label,
+            filename=filename,
+            mime_type=mime_type,
+            url=url,
+        )
+
+    def _extract_primary_query(self, query: Any) -> str:
+        text = str(query or "").strip()
+        if not text:
+            return ""
+
+        marker = "用户请求："
+        if marker not in text:
+            return text
+
+        remainder = text.split(marker, 1)[1].strip()
+        delimiters = [
+            "\n\n用户 ID：",
+            "\n用户 ID：",
+            "\n\n图片解析（没有图片时为空）：",
+            "\n图片解析（没有图片时为空）：",
+            "\n\n图片解析：",
+            "\n图片解析：",
+        ]
+        end_index = len(remainder)
+        for delimiter in delimiters:
+            index = remainder.find(delimiter)
+            if index >= 0:
+                end_index = min(end_index, index)
+
+        extracted = remainder[:end_index].strip()
+        return extracted or text
+
     def _normalize_history_message(self, message: Any) -> PromptMessage | None:
+        content = self._message_text(message)
         if isinstance(message, UserPromptMessage):
-            return UserPromptMessage(content=message.content, name=message.name)
+            return UserPromptMessage(content=content, name=message.name)
         if isinstance(message, AssistantPromptMessage):
             # Conversation history represents completed answers. Remove old tool
             # call metadata so it cannot create dangling tool-call sequences.
-            return AssistantPromptMessage(content=message.content, name=message.name, tool_calls=[])
+            return AssistantPromptMessage(content=content, name=message.name, tool_calls=[])
 
         if isinstance(message, dict):
             role_value = message.get("role")
             role = str(getattr(role_value, "value", role_value) or "").lower()
-            content = message.get("content", "")
             name = message.get("name")
         else:
             role_value = getattr(message, "role", None)
             role = str(getattr(role_value, "value", role_value) or "").lower()
-            content = getattr(message, "content", "")
             name = getattr(message, "name", None)
 
         if role == "user":
@@ -528,6 +636,8 @@ generated in the workspace.
             return [], 0
 
         history = []
+        current_query = str(query or "").strip()
+        primary_query = self._extract_primary_query(current_query)
         for raw_message in raw_history:
             message = self._normalize_history_message(raw_message)
             if message is not None:
@@ -536,7 +646,8 @@ generated in the workspace.
         # Some Dify versions may include the current query at the end of history.
         # Avoid sending it twice.
         if history and isinstance(history[-1], UserPromptMessage):
-            if self._message_text(history[-1]).strip() == str(query or "").strip():
+            last_text = self._message_text(history[-1]).strip()
+            if last_text and last_text in {current_query, primary_query}:
                 history.pop()
 
         user_positions = [
@@ -1058,6 +1169,7 @@ generated in the workspace.
             skill_filter = self._parse_enabled_skills(params.enabled_skills)
             max_active_skills = max(1, min(int(params.max_active_skills or 3), 10))
             model_config = self._to_llm_model_config(params.model)
+            primary_query = self._extract_primary_query(params.query) or str(params.query or "")
             history_messages, memory_turn_count = self._prepare_history_messages(
                 params.model,
                 params.query,
@@ -1065,10 +1177,10 @@ generated in the workspace.
             )
             routing_context = self._build_routing_context(
                 history_messages,
-                params.query,
+                primary_query,
             )
             keyword_matches = registry.match_query(
-                query=params.query,
+                query=primary_query,
                 skill_filter=skill_filter,
                 max_skills=max_active_skills,
             )
@@ -1090,7 +1202,7 @@ generated in the workspace.
 
             skill_prompt, activated_skills = self._format_selected_skills(
                 registry,
-                params.query,
+                primary_query,
                 selected_names,
             )
 
@@ -1122,7 +1234,9 @@ generated in the workspace.
                 else:
                     yield self.create_text_message("\n")
             elif params.debug_mode:
-                yield self.create_text_message(f"No skills matched query: {params.query[:100]}\n\n")
+                yield self.create_text_message(
+                    f"No skills matched query: {primary_query[:100]}\n\n"
+                )
 
             installed_infos = list_installed_skills(storage)
             if installed_infos:

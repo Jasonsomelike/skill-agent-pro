@@ -10,8 +10,8 @@ import yaml
 
 
 LOCAL_PLUGIN = (
-    "local/agent-skill-plugin-plus:1.5.0@"
-    "e9e6ee6ccd4eb04a01eb388709aac6bb17450deff0a86f91a76a7795a2892689"
+    "local/agent-skill-plugin-plus:1.5.1@"
+    "831a912c4b5028dc0e313023487b7c67c95684feba47dc1cf230081b38275ef9"
 )
 DEEPSEEK_PLUGIN = (
     "langgenius/deepseek:0.0.15@"
@@ -46,7 +46,7 @@ def dependency(plugin_identifier: str, *, local_package: bool = False) -> dict:
             "type": "package",
             "value": {
                 "plugin_unique_identifier": plugin_identifier,
-                "version": "1.5.0",
+                "version": "1.5.1",
             },
         }
     return {
@@ -163,7 +163,6 @@ def build_agent_node(source_nodes: list[dict]) -> dict:
                 "type": "constant",
                 "value": (
                     "用户请求：\n{{#sys.query#}}\n\n"
-                    "用户 ID：{{#sys.user_id#}}\n\n"
                     "图片解析（没有图片时为空）：\n{{#conversation.vision#}}"
                 ),
             },
@@ -204,10 +203,10 @@ def build_agent_node(source_nodes: list[dict]) -> dict:
                 "size": 30,
             },
         },
-        "meta": {
-            "minimum_dify_version": "1.7.0",
-            "version": "1.5.0",
-        },
+            "meta": {
+                "minimum_dify_version": "1.7.0",
+                "version": "1.5.1",
+            },
         "output_schema": {},
         "plugin_unique_identifier": LOCAL_PLUGIN,
         "selected": False,
