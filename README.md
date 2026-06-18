@@ -93,6 +93,12 @@ The built-in runtime tools are:
 
 Generated deliverables are returned through Dify Blob messages. Common DOCX, XLSX, PPTX, PDF, CSV, text, archive, and image files are also auto-exported when `auto_export_files` is enabled.
 
+## Example Learning Chatflow
+
+`chatflows/JW页分版-SkillAgent-Pro.yml` is a production-oriented computer-network learning Chatflow. It uses one Skill Agent instead of a classifier tree, keeps recent Dify history, uses persistent Bailian learning memory, and routes greetings, teaching, problem solving, answer review, question generation, learning advice, and scope handling through external Skills.
+
+The matching external Skills live in `examples/external-skills/`. Mount that directory's contents at `/opt/dify-agent-skills` for hot loading.
+
 ## Installable Skill Packages
 
 This fork adds persistent zip-based skill package management while preserving Dify tool calling.
