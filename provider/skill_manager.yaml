@@ -1,0 +1,15 @@
+identity:
+  author: local
+  name: skill_package_manager
+  icon: icon.svg
+  label:
+    en_US: Skill Package Manager
+    zh_Hans: Skill 包管理器
+  description:
+    en_US: Upload, list, delete, and download reusable agent skill packages.
+    zh_Hans: 上传、查看、删除和下载可复用的 Agent Skill 包。
+tools:
+  - tools/skill_manager.yaml
+extra:
+  python:
+    source: provider/skill_manager.py

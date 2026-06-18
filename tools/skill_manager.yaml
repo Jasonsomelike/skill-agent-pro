@@ -1,0 +1,63 @@
+identity:
+  name: skill_manager
+  author: local
+  label:
+    en_US: Skill Manager
+    zh_Hans: 技能管理
+description:
+  human:
+    en_US: Manage installable Agent Skill zip packages.
+    zh_Hans: 管理可安装的 Agent Skill zip 技能包。
+  llm: Upload, list, delete, and download Agent Skill zip packages.
+parameters:
+  - name: command
+    type: string
+    required: true
+    label:
+      en_US: Command
+      zh_Hans: 命令
+    human_description:
+      en_US: "Use one of: install, list, delete, download."
+      zh_Hans: "可用命令：install、list、delete、download。"
+    llm_description: "Use one of: install, list, delete, download."
+    form: llm
+
+  - name: skill_name
+    type: string
+    required: false
+    label:
+      en_US: Skill name
+      zh_Hans: 技能名称
+    human_description:
+      en_US: "Required for delete and download."
+      zh_Hans: "delete 和 download 命令需要填写。"
+    llm_description: "Skill name for delete or download."
+    form: llm
+
+  - name: files
+    type: files
+    required: false
+    label:
+      en_US: Skill zip files
+      zh_Hans: Skill zip 文件
+    human_description:
+      en_US: "Zip package(s) for the install command."
+      zh_Hans: "install 命令要上传的 zip 技能包。"
+    llm_description: "Zip package(s) for the install command."
+    form: form
+
+  - name: overwrite
+    type: boolean
+    required: false
+    default: false
+    label:
+      en_US: Overwrite
+      zh_Hans: 覆盖安装
+    human_description:
+      en_US: "Replace installed skills with the same name."
+      zh_Hans: "覆盖同名已安装技能。"
+    llm_description: "Whether to replace installed skills with the same name."
+    form: form
+extra:
+  python:
+    source: tools/skill_manager.py

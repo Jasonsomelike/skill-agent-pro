@@ -1,0 +1,23 @@
+triggers:
+  - 网络协议
+  - OSI
+  - 七层模型
+  - TCP/IP
+  - TCP
+  - UDP
+  - 三次握手
+  - 四次挥手
+  - IPv4
+  - IPv6
+  - 子网掩码是什么
+  - 路由协议
+  - HTTP
+  - HTTPS
+  - DNS
+  - ARP
+  - 为什么要分层
+  - 网络概念
+  - 计算机网络是什么
+  - 抓包分析
+priority: 10
+category: education

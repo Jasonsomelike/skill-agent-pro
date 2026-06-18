@@ -1,0 +1,48 @@
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+
+# Test and coverage
+tests/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Environment files
+.env
+
+# Build artifacts
+*.difypkg
+dist/
+build/
+*.egg-info/
+
+# Internal development and deployment notes
+TECHNICAL_STATUS.md
+examples/
+
+# Unwired experimental drafts (not declared in manifest.yaml)
+provider/skill_manager.py
+provider/skill_manager.yaml
+tools/

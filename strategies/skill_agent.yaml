@@ -1,0 +1,233 @@
+identity:
+  name: skill_agent
+  author: local
+  label:
+    en_US: Skill-based Agent
+    zh_Hans: Skill技能代理
+
+description:
+  en_US: An intelligent agent that uses multiple skills to handle user queries
+  zh_Hans: 使用多种技能处理用户查询的智能代理
+
+features:
+  - history-messages
+
+parameters:
+  - name: model
+    type: model-selector
+    scope: tool-call&llm
+    required: true
+    label:
+      en_US: Model
+      zh_Hans: 模型
+
+  - name: tools
+    type: array[tools]
+    required: false
+    label:
+      en_US: External Tools
+      zh_Hans: 外部工具
+
+  - name: query
+    type: string
+    required: true
+    label:
+      en_US: Query
+      zh_Hans: 查询
+
+  - name: enabled_skills
+    type: string
+    required: false
+    default: "all"
+    label:
+      en_US: Enabled Skills
+      zh_Hans: 启用的技能
+    placeholder:
+      en_US: "Comma-separated skill names or 'all'"
+      zh_Hans: "逗号分隔的技能名称或 'all'"
+
+  - name: custom_skills
+    type: string
+    required: false
+    label:
+      en_US: Custom Skills (YAML)
+      zh_Hans: 自定义技能 (YAML)
+    placeholder:
+      en_US: |
+        - name: my-skill
+          description: My custom skill
+          triggers:
+            - keyword1
+          instructions: |
+            Instructions for the skill...
+      zh_Hans: |
+        - name: my-skill
+          description: 我的自定义技能
+          triggers:
+            - 关键词1
+          instructions: |
+            技能的指令...
+    form: form
+
+  - name: skill_packages
+    type: files
+    required: false
+    label:
+      en_US: Skill Packages
+      zh_Hans: Skill 技能包
+    placeholder:
+      en_US: "Upload zip package(s) containing SKILL.md to install before this run"
+      zh_Hans: "上传包含 SKILL.md 的 zip 技能包，会在本次运行前安装"
+    form: form
+
+  - name: external_skills_dir
+    type: string
+    required: false
+    default: "/opt/dify-agent-skills"
+    label:
+      en_US: External Skills Directory
+      zh_Hans: 外部技能目录
+    placeholder:
+      en_US: "Example: /opt/dify-agent-skills"
+      zh_Hans: "例如：/opt/dify-agent-skills"
+    form: form
+
+  - name: debug_mode
+    type: boolean
+    required: false
+    default: false
+    label:
+      en_US: Debug Mode
+      zh_Hans: 调试模式
+    placeholder:
+      en_US: "Enable debug logging"
+      zh_Hans: "启用调试日志"
+
+  - name: max_active_skills
+    type: number
+    required: true
+    default: 3
+    label:
+      en_US: Max Active Skills
+      zh_Hans: 最大激活技能数
+    max: 10
+    min: 1
+
+  - name: semantic_skill_matching
+    type: boolean
+    required: false
+    default: true
+    label:
+      en_US: Semantic Skill Matching
+      zh_Hans: 语义技能匹配
+    placeholder:
+      en_US: "Use the selected model to route queries when no trigger matches"
+      zh_Hans: "当触发词未命中时，使用所选模型进行语义路由"
+
+  - name: history_turns
+    type: number
+    required: true
+    default: 10
+    label:
+      en_US: Memory Turns
+      zh_Hans: 记忆轮数
+    placeholder:
+      en_US: "Number of recent conversation turns included in the model context"
+      zh_Hans: "加入模型上下文的最近对话轮数，设为 0 可关闭记忆"
+    max: 100
+    min: 0
+
+  - name: allow_skill_commands
+    type: boolean
+    required: false
+    default: false
+    label:
+      en_US: Allow Skill Commands
+      zh_Hans: 允许技能命令
+    placeholder:
+      en_US: "Allow installed skills to execute whitelisted commands"
+      zh_Hans: "允许已安装技能执行白名单命令"
+
+  - name: allowed_commands
+    type: string
+    required: false
+    default: "python,python3,node,npm,npx,bun,sh,bash"
+    label:
+      en_US: Allowed Commands
+      zh_Hans: 命令白名单
+    placeholder:
+      en_US: "Comma-separated executable allowlist"
+      zh_Hans: "用逗号分隔的可执行命令白名单"
+
+  - name: allow_runtime_execution
+    type: boolean
+    required: false
+    default: false
+    label:
+      en_US: Allow Runtime Execution
+      zh_Hans: 允许运行时执行
+    placeholder:
+      en_US: "Allow Python and allowlisted commands in an isolated per-run workspace"
+      zh_Hans: "允许在每次运行的独立工作区中执行 Python 和白名单命令"
+
+  - name: runtime_allowed_commands
+    type: string
+    required: false
+    default: "python,python3,node,npm,npx,bun,sh,bash"
+    label:
+      en_US: Runtime Command Allowlist
+      zh_Hans: 运行时命令白名单
+    placeholder:
+      en_US: "Comma-separated executable allowlist for the runtime workspace"
+      zh_Hans: "运行时工作区可执行命令白名单，用逗号分隔"
+
+  - name: runtime_command_timeout
+    type: number
+    required: true
+    default: 60
+    label:
+      en_US: Runtime Command Timeout
+      zh_Hans: 运行时命令超时
+    placeholder:
+      en_US: "Maximum seconds for one runtime command"
+      zh_Hans: "单次运行时命令的最大执行秒数"
+    max: 300
+    min: 1
+
+  - name: runtime_max_file_mb
+    type: number
+    required: true
+    default: 20
+    label:
+      en_US: Runtime Max File Size
+      zh_Hans: 运行时最大文件大小
+    placeholder:
+      en_US: "Maximum size in MB for a written or exported workspace file"
+      zh_Hans: "工作区单个写入或导出文件的最大 MB"
+    max: 100
+    min: 1
+
+  - name: auto_export_files
+    type: boolean
+    required: false
+    default: true
+    label:
+      en_US: Auto Export Generated Files
+      zh_Hans: 自动导出生成文件
+    placeholder:
+      en_US: "Automatically attach common deliverable files left in the workspace"
+      zh_Hans: "自动把工作区中的常见交付文件作为附件返回"
+
+  - name: maximum_iterations
+    type: number
+    required: true
+    default: 10
+    label:
+      en_US: Maximum Iterations
+      zh_Hans: 最大迭代次数
+    max: 50
+    min: 1
+
+extra:
+  python:
+    source: strategies/skill_agent.py
