@@ -13,7 +13,7 @@
 - 当前阶段结论：
   - 代码、skills、chatflow、部署产物和线上应用切换均已完成
   - Dify 应用已切换到最新 published workflow，切换后的全量线上冒烟已通过
-  - 当前仅剩将已验证版本同步并发布到 GitHub
+  - 已验证版本已同步到 GitHub 发布分支，当前仅剩创建并合并 Pull Request
 
 当前关键文件与目录：
 
@@ -322,25 +322,39 @@ a7d68723-da54-45e3-a742-d746f4f852c7
 
 ## 6. 仍需完成的事项
 
-### 6.1 同步到 GitHub 新项目
+### 6.1 GitHub 发布状态
 
-1. 将当前项目同步到 `E:\vibecoding\skill-agent-pro`
-2. 建立或完善 GitHub 仓库 `skill-agent-pro`
-3. 提交并推送当前可用版本
+已完成：
 
-当前本机 `gh` CLI 已安装，但尚未登录 GitHub。推送或创建 PR 前需要完成：
+- 已同步到 `E:\vibecoding\skill-agent-pro`
+- GitHub 仓库：`Jasonsomelike/skill-agent-pro`
+- 发布分支：`codex/release-1.5.4`
+- 发布提交：`53330e4`（后续状态文档提交会追加在同一分支）
+- 分支已成功推送到远端
+
+仍需完成：
+
+- 创建从 `codex/release-1.5.4` 到 `main` 的 Pull Request
+
+当前本机 `gh` CLI 已安装，但尚未登录 GitHub；GitHub App 对该仓库创建 PR 返回 404。可登录 CLI 后创建：
 
 ```powershell
 gh auth login
+gh pr create --draft --base main --head codex/release-1.5.4 --title "[codex] Release Skill Agent Pro 1.5.4"
+```
+
+也可直接打开：
+
+```text
+https://github.com/Jasonsomelike/skill-agent-pro/pull/new/codex/release-1.5.4
 ```
 
 ## 7. 当前建议的执行顺序
 
-1. 同步当前已验证快照到 `E:\vibecoding\skill-agent-pro`
-2. 运行单元测试、`ruff`、external skills 校验和 chatflow DSL 校验
-3. 登录 GitHub CLI
-4. 提交、推送并创建发布 PR
+1. 登录 GitHub CLI，或在浏览器打开预填 PR 页面
+2. 创建 draft PR：`codex/release-1.5.4` → `main`
+3. 等待 CI 通过后审阅并合并
 
 ## 8. 结论
 
-截至 2026-06-19，`1.5.4` 本地代码、外部 skills、最终 chatflow DSL、插件安装、应用 workflow 切换和切换后线上冒烟均已完成。线上 6 次验证全部由最新 published workflow 执行成功，Bilibili、文生图、百炼持久化记忆、Mermaid 和知识库页图均已确认正常。当前仅剩 GitHub 同步、提交与推送。
+截至 2026-06-19，`1.5.4` 本地代码、外部 skills、最终 chatflow DSL、插件安装、应用 workflow 切换和切换后线上冒烟均已完成。线上 6 次验证全部由最新 published workflow 执行成功，Bilibili、文生图、百炼持久化记忆、Mermaid 和知识库页图均已确认正常。代码已提交并推送到 `codex/release-1.5.4`，当前仅剩创建和合并 Pull Request。
