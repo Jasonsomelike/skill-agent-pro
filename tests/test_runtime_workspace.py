@@ -8,6 +8,7 @@ from skills.runtime_workspace import (
     read_workspace_file,
     run_workspace_python,
     safe_workspace_path,
+    save_workspace_blob,
     write_workspace_file,
 )
 
@@ -48,6 +49,17 @@ class RuntimeWorkspaceTests(unittest.TestCase):
             self.assertEqual(export.mime_type, "application/pdf")
             exports = collect_exportable_files(root)
             self.assertEqual([item.relative_path for item in exports], ["report.pdf"])
+
+    def test_save_workspace_blob_creates_safe_tool_asset(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            result = save_workspace_blob(
+                root,
+                data=b"image-bytes",
+                filename="../../diagram.png",
+            )
+            self.assertEqual(result["path"], "tool-assets/diagram.png")
+            self.assertEqual((root / result["path"]).read_bytes(), b"image-bytes")
 
 
 if __name__ == "__main__":

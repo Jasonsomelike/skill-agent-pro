@@ -32,6 +32,7 @@ from dify_plugin.entities.tool import ToolInvokeMessage, ToolParameter, ToolProv
 from dify_plugin.interfaces.agent import AgentModelConfig, AgentStrategy, ToolEntity
 
 from skills import SkillContext, SkillLoader, SkillRegistry
+from skills.besti_document import generate_besti_docx
 from skills.package_store import (
     get_skill_metadata,
     hydrate_installed_skills,
@@ -49,6 +50,8 @@ from skills.runtime_workspace import (
     read_workspace_file,
     run_workspace_command,
     run_workspace_python,
+    safe_workspace_path,
+    save_workspace_blob,
     write_workspace_file,
 )
 
@@ -117,6 +120,18 @@ When a knowledge-base tool returns source metadata or page images:
    syntax. Do not omit the image, output only a bare URL, or replace it with
    an illustration from inside the page.
 
+When presenting a learning roadmap or "后续路线":
+1. Use a fenced ```mermaid block with `flowchart LR` or `flowchart TD`.
+2. Use simple ASCII node IDs and quoted Chinese labels.
+3. Never use plain-text arrows, box-drawing characters, or an unlabeled code block.
+
+When image-generation and Bilibili tools are available:
+1. Use text2image only when the user requests an image or a visual materially
+   improves understanding. Label generated images as AI teaching illustrations.
+2. Use bilibili_search for learning-video discovery and
+   bilibili_get_video_info to verify final recommendations.
+3. Do not invent video metadata, timestamps, popularity, or content.
+
 Installed skill packages may include reference files and scripts. Use the
 skill_* tools to inspect those packages only when the active skill instructions
 or the user task require deeper package content.
@@ -147,6 +162,7 @@ When long-term memory tools are available:
         "runtime_run_python",
         "runtime_run_command",
         "runtime_export_file",
+        "runtime_generate_besti_docx",
     }
 
     INTERNAL_TOOL_SCHEMAS: list[dict[str, Any]] = [
@@ -329,6 +345,100 @@ When long-term memory tools are available:
                     "type": "object",
                     "properties": {"relative_path": {"type": "string"}},
                     "required": ["relative_path"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "runtime_generate_besti_docx",
+                "description": (
+                    "Generate a real Word DOCX using the Besti official-document standard: "
+                    "A4; margins 3.6/3.0/2.7/2.7 cm; title in 22 pt Founder Small "
+                    "Standard Song; body in 16 pt FangSong; exact 29 pt line spacing; "
+                    "Chinese heading fonts; full-width list punctuation; centered page numbers. "
+                    "Use this for every Word/DOCX request unless the user explicitly requests "
+                    "another format. It can insert workspace images and structured tables."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "filename": {"type": "string", "description": "Output .docx filename."},
+                        "title": {"type": "string"},
+                        "subtitle": {"type": "string"},
+                        "recipient": {"type": "string"},
+                        "body": {
+                            "type": "string",
+                            "description": (
+                                "Document body. Put each paragraph on its own line. "
+                                "Use 一、, （一）, and 1． prefixes for heading levels."
+                            ),
+                        },
+                        "organization": {"type": "string"},
+                        "date_text": {"type": "string", "description": "Example: 2026 年 6 月 18 日"},
+                        "document_type": {
+                            "type": "string",
+                            "enum": ["white-paper", "red-header", "meeting-minutes", "general"],
+                            "default": "white-paper",
+                        },
+                        "header_text": {"type": "string"},
+                        "document_number": {"type": "string"},
+                        "attachments": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                        "images": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "path": {
+                                        "type": "string",
+                                        "description": "Relative path of an image in the runtime workspace.",
+                                    },
+                                    "caption": {"type": "string"},
+                                    "width_cm": {"type": "number", "default": 14.0},
+                                    "placement": {
+                                        "type": "string",
+                                        "enum": ["body", "attachment"],
+                                        "default": "attachment",
+                                    },
+                                },
+                                "required": ["path"],
+                            },
+                        },
+                        "tables": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "title": {"type": "string"},
+                                    "headers": {
+                                        "type": "array",
+                                        "items": {"type": "string"},
+                                    },
+                                    "rows": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "array",
+                                            "items": {"type": "string"},
+                                        },
+                                    },
+                                    "column_widths_cm": {
+                                        "type": "array",
+                                        "items": {"type": "number"},
+                                    },
+                                    "placement": {
+                                        "type": "string",
+                                        "enum": ["body", "attachment"],
+                                        "default": "attachment",
+                                    },
+                                },
+                                "required": ["headers", "rows"],
+                            },
+                        },
+                    },
+                    "required": ["filename", "title", "body"],
                 },
             },
         },
@@ -1089,6 +1199,8 @@ When long-term memory tools are available:
         if records:
             return records
 
+        # Conservative fallback for unusual wrappers: only pair an image with a
+        # document_name when both occur inside the same dictionary-like block.
         for block_match in re.finditer(
             r"\{[^{}]*?['\"]content['\"]\s*:\s*(?P<content>.+?)"
             r"['\"]document_name['\"]\s*:\s*['\"](?P<document>[^'\"]+)['\"][^{}]*?\}",
@@ -1218,6 +1330,34 @@ When long-term memory tools are available:
 
         if tool_name == "skill_list_installed":
             return {"skills": self._skill_inventory(registry, skill_sources)}, []
+
+        if tool_name == "runtime_generate_besti_docx":
+            filename = str(tool_args.get("filename") or "Besti公文.docx").strip()
+            if not filename.lower().endswith(".docx"):
+                filename += ".docx"
+            output_path = safe_workspace_path(workspace_root, filename)
+            result = generate_besti_docx(
+                workspace_root,
+                output_path=output_path,
+                title=str(tool_args.get("title") or "公文"),
+                subtitle=str(tool_args.get("subtitle") or ""),
+                recipient=str(tool_args.get("recipient") or ""),
+                body=str(tool_args.get("body") or ""),
+                organization=str(tool_args.get("organization") or ""),
+                date_text=str(tool_args.get("date_text") or ""),
+                document_type=str(tool_args.get("document_type") or "white-paper"),
+                header_text=str(tool_args.get("header_text") or ""),
+                document_number=str(tool_args.get("document_number") or ""),
+                attachments=list(tool_args.get("attachments") or []),
+                images=list(tool_args.get("images") or []),
+                tables=list(tool_args.get("tables") or []),
+            )
+            export = prepare_workspace_export(
+                workspace_root,
+                result["path"],
+                max_file_bytes=max_file_bytes,
+            )
+            return result, [export]
 
         if tool_name == "skill_get_metadata":
             return (
@@ -1532,6 +1672,11 @@ When long-term memory tools are available:
             iteration = 0
             exported_paths: set[str] = set()
             knowledge_citations: list[dict[str, Any]] = []
+            saved_tool_blob_count = 0
+            max_file_bytes = max(
+                1,
+                min(int(params.runtime_max_file_mb or 20), 100),
+            ) * 1024 * 1024
             finished_normally = False
             while iteration < params.maximum_iterations:
                 iteration += 1
@@ -1664,6 +1809,31 @@ When long-term memory tools are available:
                                         == ToolInvokeMessage.MessageType.BLOB
                                         and hasattr(getattr(result, "message", None), "blob")
                                     ):
+                                        saved_tool_blob_count += 1
+                                        meta = getattr(result, "meta", None) or {}
+                                        filename = ""
+                                        mime_type = ""
+                                        if isinstance(meta, dict):
+                                            filename = str(meta.get("filename") or "")
+                                            mime_type = str(meta.get("mime_type") or "")
+                                        if not filename:
+                                            suffix = {
+                                                "image/jpeg": ".jpg",
+                                                "image/png": ".png",
+                                                "image/webp": ".webp",
+                                                "image/gif": ".gif",
+                                            }.get(mime_type, ".bin")
+                                            filename = f"{tool_name}-{saved_tool_blob_count}{suffix}"
+                                        saved_blob = save_workspace_blob(
+                                            workspace_root,
+                                            data=result.message.blob,
+                                            filename=filename,
+                                            max_file_bytes=max_file_bytes,
+                                        )
+                                        tool_result_parts.append(
+                                            "Tool file saved in runtime workspace: "
+                                            f"{saved_blob['path']}"
+                                        )
                                         yield self.create_blob_message(
                                             blob=result.message.blob,
                                             meta=getattr(result, "meta", None),

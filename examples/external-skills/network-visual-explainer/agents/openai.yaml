@@ -1,0 +1,4 @@
+interface:
+  display_name: "网络教学配图"
+  short_description: "在必要时生成清晰准确且便于理解的计算机网络教学示意图片"
+  default_prompt: "为这个计算机网络知识点生成一张准确、清晰的教学配图。"

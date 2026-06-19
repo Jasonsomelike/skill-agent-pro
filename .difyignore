@@ -38,6 +38,18 @@ dist/
 build/
 *.egg-info/
 
+# Development-only artifacts
+.github/
+.gitignore
+.env.example
+DEVELOPMENT.md
+PRIVACY.md
+README.md
+SKILL_DESIGN_SPEC.md
+chatflows/
+scripts/
+tmp/
+
 # Internal development and deployment notes
 TECHNICAL_STATUS.md
 examples/

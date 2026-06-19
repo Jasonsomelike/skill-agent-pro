@@ -8,6 +8,7 @@ import os
 import shlex
 import subprocess
 import sys
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -123,6 +124,34 @@ def write_workspace_file(
         "size": path.stat().st_size,
         "encoding": normalized_encoding,
         "appended": bool(append),
+    }
+
+
+def save_workspace_blob(
+    root: Path,
+    *,
+    data: bytes,
+    filename: str = "",
+    subdir: str = "tool-assets",
+    max_file_bytes: int = DEFAULT_MAX_FILE_BYTES,
+) -> dict[str, Any]:
+    payload = bytes(data or b"")
+    max_bytes = _bounded_file_limit(max_file_bytes)
+    if len(payload) > max_bytes:
+        raise RuntimeError(f"blob exceeds runtime limit of {max_bytes} bytes")
+
+    raw_name = Path(str(filename or "")).name
+    if not raw_name or raw_name in {".", ".."}:
+        raw_name = f"tool-file-{uuid.uuid4().hex[:12]}.bin"
+    target = safe_workspace_path(root, f"{subdir}/{raw_name}")
+    if target.exists():
+        target = target.with_name(f"{target.stem}-{uuid.uuid4().hex[:8]}{target.suffix}")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(payload)
+    return {
+        "path": target.relative_to(root.resolve()).as_posix(),
+        "filename": target.name,
+        "size": len(payload),
     }
 
 

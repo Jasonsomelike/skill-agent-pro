@@ -1,0 +1,679 @@
+app:
+  description: 计算机网络学习 Chatflow：Skill 自动路由、长期学习记忆、图片理解、知识库优先与下一步学习建议。
+  icon: 087610de-2925-4382-999f-efb510167e7d
+  icon_background: ''
+  icon_type: image
+  mode: advanced-chat
+  name: JW页分版-SkillAgent-Pro
+  use_icon_as_answer_icon: true
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/tongyi:0.1.45@7f2b2d5b163de4c1ad8fad80e624c08d47ed7942a6a534e88e5786e65073f3ca
+    version: null
+kind: app
+version: 0.6.0
+workflow:
+  conversation_variables:
+  - description: 当前轮用户上传图片的结构化解析结果；无图片时主动清空。
+    id: ff612829-19ee-4d71-ab16-158b0b87c4d6
+    name: vision
+    selector:
+    - conversation
+    - vision
+    value: ''
+    value_type: string
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .JPG
+      - .JPEG
+      - .PNG
+      - .GIF
+      - .WEBP
+      - .SVG
+      allowed_file_types:
+      - image
+      allowed_file_upload_methods:
+      - remote_url
+      - local_file
+      enabled: true
+      fileUploadConfig:
+        attachment_image_file_size_limit: 100
+        audio_file_size_limit: 100
+        batch_count_limit: 5
+        file_size_limit: 100
+        file_upload_limit: 20
+        image_file_batch_limit: 10
+        image_file_size_limit: 100
+        single_chunk_attachment_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 100
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 10
+    opening_statement: 你好，我是 Skill Agent Pro 计算机网络学习助手。我可以讲概念、解题、批改、出题，也能根据长期学习记录建议下一步。你今天想从哪里开始？
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: true
+    suggested_questions:
+    - 根据我的学习记录，下一步应该学什么？
+    - 给我讲讲 OSI 与 TCP/IP 模型的区别
+    - 出 5 道子网划分题考考我
+    suggested_questions_after_answer:
+      enabled: true
+      model:
+        completion_params:
+          echo: false
+          frequency_penalty: 0
+          max_tokens: 0
+          presence_penalty: 0
+          stop: []
+          temperature: 0.7
+          top_p: 0
+        mode: chat
+        name: deepseek-v4-flash
+        provider: langgenius/deepseek/deepseek
+    text_to_speech:
+      enabled: true
+      language: zh-Hans
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: if-else
+      id: 1711528708197-source-1780798147131-target
+      selected: false
+      source: '1711528708197'
+      sourceHandle: source
+      target: '1780798147131'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: if-else
+        targetType: llm
+      id: 1780798147131-true-17807981172390-target
+      selected: false
+      source: '1780798147131'
+      sourceHandle: 'true'
+      target: '17807981172390'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: assigner
+      id: 17807981172390-source-1780799440648-target
+      selected: false
+      source: '17807981172390'
+      sourceHandle: source
+      target: '1780799440648'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: assigner
+        targetType: agent
+      id: 1780799440648-source-1780803518766-target
+      selected: false
+      source: '1780799440648'
+      sourceHandle: source
+      target: '1780803518766'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: if-else
+        targetType: assigner
+      id: 1780798147131-false-skill-clear-vision-target
+      selected: false
+      source: '1780798147131'
+      sourceHandle: 'false'
+      target: skill-clear-vision
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: assigner
+        targetType: agent
+      id: skill-clear-vision-source-1780803518766-target
+      selected: false
+      source: skill-clear-vision
+      sourceHandle: source
+      target: '1780803518766'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: agent
+        targetType: answer
+      id: 1780803518766-source-1780668375718-target
+      selected: false
+      source: '1780803518766'
+      sourceHandle: source
+      target: '1780668375718'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        desc: ''
+        selected: false
+        title: 开始
+        type: start
+        variables: []
+      height: 72
+      id: '1711528708197'
+      position:
+        x: 60
+        y: 360
+      positionAbsolute:
+        x: 60
+        y: 360
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        cases:
+        - case_id: 'true'
+          conditions:
+          - comparison_operator: contains
+            id: 22abe346-0388-4a18-8c93-d11e65a8ace4
+            sub_variable_condition:
+              case_id: 5785160c-ef64-4b5f-b94e-85fce10da8ae
+              conditions: []
+              logical_operator: and
+            value: ''
+            varType: array[file]
+            variable_selector:
+            - sys
+            - files
+          id: 'true'
+          logical_operator: and
+        selected: false
+        title: 是否上传图片
+        type: if-else
+      height: 123
+      id: '1780798147131'
+      position:
+        x: 360
+        y: 360
+      positionAbsolute:
+        x: 360
+        y: 360
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        desc: ''
+        isInIteration: false
+        isInLoop: false
+        memory:
+          query_prompt_template: '{{#sys.query#}}
+
+
+            {{#sys.files#}}'
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 50
+        model:
+          completion_params:
+            temperature: 0.7
+          mode: chat
+          name: qwen3-vl-plus
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: aa17f2b4-3960-4051-a5ad-9797bb44fcf1
+          role: system
+          text: '#### 任务
+
+            分析图片，生成一份全面、结构化的内容描述，供下游大语言模型精准理解图片信息。
+
+
+            #### 要求：
+
+            1. 涵盖图片所有元素：场景环境、主体对象、背景细节、色彩、位置关系、文字内容（如有）、氛围等，确保信息完整。
+
+            2. 描述精准且富有逻辑，避免关键词堆砌。
+
+            3. 输出结构清晰，可分块或使用JSON字段（如“场景概括”、“主体”、“细节”、“氛围”），便于下一LLM解析。
+
+            4. 仅输出图片内容，不添加无关信息或主观推测。
+
+            5. 不受任何外部查询影响，严格基于图像。
+
+            6.如果是题目，也不要自行解题。'
+        selected: false
+        title: 解析网络图片
+        type: llm
+        vision:
+          configs:
+            detail: high
+            variable_selector:
+            - sys
+            - files
+          enabled: true
+      height: 87
+      id: '17807981172390'
+      position:
+        x: 670
+        y: 120
+      positionAbsolute:
+        x: 670
+        y: 120
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        items:
+        - input_type: variable
+          operation: over-write
+          value:
+          - '17807981172390'
+          - text
+          variable_selector:
+          - conversation
+          - vision
+        selected: false
+        title: 保存图片上下文
+        type: assigner
+        version: '2'
+      height: 83
+      id: '1780799440648'
+      position:
+        x: 1000
+        y: 120
+      positionAbsolute:
+        x: 1000
+        y: 120
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        items:
+        - input_type: variable
+          operation: clear
+          value: []
+          variable_selector:
+          - conversation
+          - vision
+        selected: false
+        title: 清空图片上下文
+        type: assigner
+        version: '2'
+      height: 83
+      id: skill-clear-vision
+      position:
+        x: 670
+        y: 580
+      positionAbsolute:
+        x: 670
+        y: 580
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        agent_parameters:
+          allow_runtime_execution:
+            type: constant
+            value: true
+          allow_skill_commands:
+            type: constant
+            value: true
+          allowed_commands:
+            type: constant
+            value: python,python3,node,npm,npx,bun,sh,bash
+          auto_export_files:
+            type: constant
+            value: true
+          custom_skills:
+            type: constant
+            value: ''
+          debug_mode:
+            type: constant
+            value: false
+          enabled_skills:
+            type: constant
+            value: all
+          external_skills_dir:
+            type: constant
+            value: /opt/dify-agent-skills
+          history_turns:
+            type: constant
+            value: 30
+          max_active_skills:
+            type: constant
+            value: 10
+          maximum_iterations:
+            type: constant
+            value: 20
+          model:
+            type: constant
+            value:
+              completion_params:
+                temperature: 0.35
+              mode: chat
+              model: deepseek-v4-pro
+              model_type: llm
+              provider: langgenius/deepseek/deepseek
+              type: model-selector
+          query:
+            type: constant
+            value: '用户请求：
+
+              {{#sys.query#}}
+
+
+              图片解析（没有图片时为空）：
+
+              {{#conversation.vision#}}'
+          runtime_allowed_commands:
+            type: constant
+            value: python,python3
+          runtime_command_timeout:
+            type: constant
+            value: 60
+          runtime_max_file_mb:
+            type: constant
+            value: 20
+          semantic_skill_matching:
+            type: constant
+            value: true
+          skill_packages:
+            type: constant
+            value: []
+          tools:
+            type: constant
+            value:
+            - enabled: true
+              extra:
+                description: 从知识库中检索，供agent使用
+              parameters:
+                act:
+                  auto: 1
+                  value: null
+              provider_name: 92c34808-c80d-4fc7-b404-979fbeda0eb7
+              provider_show_name: 知识库
+              settings: {}
+              tool_description: 从知识库中检索，供agent使用
+              tool_label: 知识库
+              tool_name: getKonwledgeBase
+              type: workflow
+            - enabled: true
+              extra:
+                description: 分页查看用户的所有记忆。
+              parameters:
+                page_num:
+                  auto: 0
+                  value:
+                    type: constant
+                    value: 1
+                page_size:
+                  auto: 0
+                  value:
+                    type: constant
+                    value: 50
+                user_id:
+                  auto: 0
+                  value:
+                    type: mixed
+                    value: '{{#sys.user_id#}}'
+              provider_name: langgenius/bailian_memory/bailian_memory
+              provider_show_name: langgenius/bailian_memory/bailian_memory
+              settings: {}
+              tool_description: 分页查看用户的所有记忆。
+              tool_label: 列出记忆
+              tool_name: list_memory
+              type: builtin
+            - enabled: true
+              extra:
+                description: 将对话消息或自定义内容存储为记忆片段，自动提取关键信息并构建语义索引。
+              parameters:
+                custom_content:
+                  auto: 1
+                  value: null
+                messages:
+                  auto: 1
+                  value: null
+                meta_data:
+                  auto: 1
+                  value: null
+                profile_schema_id:
+                  auto: 1
+                  value: null
+                user_id:
+                  auto: 0
+                  value:
+                    type: mixed
+                    value: '{{#sys.user_id#}}'
+              provider_name: langgenius/bailian_memory/bailian_memory
+              provider_show_name: langgenius/bailian_memory/bailian_memory
+              settings: {}
+              tool_description: 将对话消息或自定义内容存储为记忆片段，自动提取关键信息并构建语义索引。
+              tool_label: 添加记忆
+              tool_name: add_memory
+              type: builtin
+            - enabled: true
+              extra:
+                description: 更新已有记忆节点的内容。
+              parameters:
+                custom_content:
+                  auto: 1
+                  value: null
+                memory_node_id:
+                  auto: 1
+                  value: null
+                meta_data:
+                  auto: 1
+                  value: null
+                user_id:
+                  auto: 0
+                  value:
+                    type: mixed
+                    value: '{{#sys.user_id#}}'
+              provider_name: langgenius/bailian_memory/bailian_memory
+              provider_show_name: langgenius/bailian_memory/bailian_memory
+              settings: {}
+              tool_description: 更新已有记忆节点的内容。
+              tool_label: 更新记忆
+              tool_name: update_memory
+              type: builtin
+            - enabled: true
+              extra:
+                description: 安思派联网搜索插件面向AI的下一代实时智能搜索引擎，为您的应用提供格式友好的多渠道全网内容。
+              parameters:
+                FromTime:
+                  auto: 1
+                  value: null
+                Insite:
+                  auto: 1
+                  value: null
+                ToTime:
+                  auto: 1
+                  value: null
+                query:
+                  auto: 1
+                  value: null
+                top_k:
+                  auto: 1
+                  value: null
+              provider_name: anspire/anspire_search/anspire_search
+              provider_show_name: anspire/anspire_search/anspire_search
+              settings: {}
+              tool_description: 安思派联网搜索插件面向AI的下一代实时智能搜索引擎，为您的应用提供格式友好的多渠道全网内容。
+              tool_label: 安思派联网搜索
+              tool_name: anspire_search
+              type: builtin
+            - enabled: true
+              extra:
+                description: 一款基于现代Web技术栈开发的高效数据采集插件，通过URL获取AI友好的网页内容，为企业级用户提供稳定可靠的高质量数据获取解决方案。
+              parameters:
+                format:
+                  auto: 1
+                  value: null
+                site_url:
+                  auto: 1
+                  value: null
+              provider_name: anspire/anspire_search/anspire_search
+              provider_show_name: anspire/anspire_search/anspire_search
+              settings: {}
+              tool_description: 一款基于现代Web技术栈开发的高效数据采集插件，通过URL获取AI友好的网页内容，为企业级用户提供稳定可靠的高质量数据获取解决方案。
+              tool_label: 网页内容抓取
+              tool_name: anspire_crawl
+              type: builtin
+            - enabled: true
+              extra:
+                description: 使用Seedream模型根据文本描述生成图像
+              parameters:
+                prompt:
+                  auto: 1
+                  value: null
+              provider_name: sawyer-shi/seedream_aigc/seedream_aigc
+              provider_show_name: sawyer-shi/seedream_aigc/seedream_aigc
+              settings:
+                model:
+                  value:
+                    type: constant
+                    value: doubao-seedream-4-5-251128
+                size:
+                  value:
+                    type: constant
+                    value: 2048x2048
+                watermark:
+                  value:
+                    type: constant
+                    value: 'true'
+              tool_description: 使用Seedream模型根据文本描述生成图像
+              tool_label: Seedream-文生图
+              tool_name: text2image
+              type: builtin
+            - enabled: true
+              extra:
+                description: 在哔哩哔哩上搜索视频
+              parameters:
+                keyword:
+                  auto: 1
+                  value: null
+                page:
+                  auto: 1
+                  value: null
+              provider_name: jingfelix/bilibili_search/bilibili_search
+              provider_show_name: jingfelix/bilibili_search/bilibili_search
+              settings: {}
+              tool_description: 在哔哩哔哩上搜索视频
+              tool_label: 哔哩哔哩搜索
+              tool_name: bilibili_search
+              type: builtin
+            - enabled: true
+              extra:
+                description: 获取哔哩哔哩视频信息
+              parameters:
+                bvid:
+                  auto: 1
+                  value: null
+              provider_name: jingfelix/bilibili_search/bilibili_search
+              provider_show_name: jingfelix/bilibili_search/bilibili_search
+              settings: {}
+              tool_description: 获取哔哩哔哩视频信息
+              tool_label: 获取哔哩哔哩视频信息
+              tool_name: bilibili_get_video_info
+              type: builtin
+        agent_strategy_label: Skill-based Agent
+        agent_strategy_name: skill_agent
+        agent_strategy_provider_name: local/agent-skill-plugin-plus/agent_skill_provider
+        desc: 由外部 Skills 路由问候、教学、解题、批改、出题、学习建议与边界处理。
+        memory:
+          query_prompt_template: '{{#sys.query#}}
+
+
+            {{#sys.files#}}'
+          window:
+            enabled: true
+            size: 30
+        meta:
+          minimum_dify_version: 1.7.0
+          version: 1.5.3
+        output_schema: {}
+        plugin_unique_identifier: local/agent-skill-plugin-plus:1.5.3@59585d776901ad3ac11835dab6d8f267c31d26f5e08219e3e32aad0503c2afa5
+        selected: false
+        title: Skill 学习 Agent
+        tool_node_version: '2'
+        type: agent
+      height: 231
+      id: '1780803518766'
+      position:
+        x: 1000
+        y: 360
+      positionAbsolute:
+        x: 1000
+        y: 360
+      selected: true
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        answer: '{{#1780803518766.text#}}{{#1780803518766.files#}}'
+        selected: false
+        title: 学习助手回复
+        type: answer
+        variables: []
+      height: 121
+      id: '1780668375718'
+      position:
+        x: 1320
+        y: 360
+      positionAbsolute:
+        x: 1320
+        y: 360
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    viewport:
+      x: -1599.8896394704266
+      y: -160.99780867567813
+      zoom: 1.5552861086223024
+  rag_pipeline_variables: []

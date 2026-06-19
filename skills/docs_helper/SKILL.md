@@ -95,8 +95,11 @@ When writing technical documentation:
 ### 5. Office Document Generation
 When generating office files:
 - Preserve the user's requested wording exactly unless editing is requested
-- Use readable default typography and margins
+- For every Word/DOCX request, use `runtime_generate_besti_docx` and the Besti official-document standard unless the user explicitly specifies another template
+- Besti defaults: A4 portrait; margins 3.6/3.0/2.7/2.7 cm; 22 pt Founder Small Standard Song title; 16 pt FangSong body; exact 29 pt line spacing; full-width Chinese list punctuation; centered `— PAGE —` footer
 - Add headings, tables, and page structure only when they improve the result
+- Insert relevant images when they materially improve comprehension and a real workspace image is available; pass the relative image path to `runtime_generate_besti_docx` and keep the default attachment placement unless a compact inline image is clearly appropriate
+- Keep compact inline tables in the body only with `placement=body`; otherwise let tables default to attachment pages after the signature/date block
 - For follow-up turns, continue the same document intent instead of treating the short reply as a new unrelated task
 - Verify that the output file exists and is non-empty before exporting it
 

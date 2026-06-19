@@ -1,0 +1,4 @@
+interface:
+  display_name: "Besti 公文生成"
+  short_description: "严格按照 Besti 公文规范生成并导出正式 Word 文档"
+  default_prompt: "按 Besti 公文格式生成并导出 Word 文档。"

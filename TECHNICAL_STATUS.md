@@ -1,377 +1,346 @@
 # Agent Skill Plugin Plus 技术状态文档
 
-> 更新时间：2026-06-18
-> 文档用途：记录当前插件的实现进度、服务器登录方式、部署位置、已完成能力与剩余待办。
-> 注意：生产服务器凭据不存放在仓库中。部署时请通过密码管理器、SSH Agent 或环境变量提供。
+> 更新时间：2026-06-19
+> 文档用途：记录当前插件、外部 skills、Dify chatflow、服务器部署状态，以及当前剩余阻塞点。
+> 注意：生产服务器凭据不存放在仓库中。部署时请通过密码管理器、SSH Agent、密钥文件或环境变量提供。
 
-## 1. 项目概况
+## 1. 当前总览
 
 - 本地工作目录：`E:\vibecoding\skill-create`
-- 当前本地插件版本：`1.5.0`
+- 当前本地插件版本：`1.5.4`
 - 当前插件名称：`agent-skill-plugin-plus`
 - 插件类型：`agent strategy plugin`
-- `manifest.yaml` 当前只声明了 `agent_strategies`，没有把 `tool`、`model`、`endpoint`、`datasource` 等能力混写进同一个包。
-
-当前关键文件：
-
-- `manifest.yaml`
-- `provider/agent_skill.yaml`
-- `strategies/skill_agent.yaml`
-- `strategies/skill_agent.py`
-- `skills/runtime_workspace.py`
-- `SKILL_DESIGN_SPEC.md`
-
-当前仓库是脏工作区，存在未提交改动与新增文件，这意味着本地状态是“持续开发中”的快照，不等于一个干净发布分支。
-
-## 2. 当前已完成的点
-
-### 2.1 插件打包与安装问题已修复
-
-已解决此前上传失败问题：
-
-```text
-agent_strategy and tool, model, endpoint, trigger, or datasource cannot be provided at the same time
-```
-
-处理结果：
-
-- 插件被固定为纯 `agent strategy` 类型；
-- `manifest.yaml` 不再混入 `tool` 能力；
-- 可以正常打包为 `.difypkg` 并在 Dify 中升级安装。
-
-### 2.2 Pydantic 参数模型问题已修复
-
-已处理此前运行时报错：
-
-```text
-SkillAgentParams is not fully defined
-```
-
-处理方式：
-
-- 在 `strategies/skill_agent.py` 中对 `SkillAgentParams` 执行了 `model_rebuild(...)`；
-- 显式补齐了 `AgentModelConfig`、`ToolEntity`、`List`、`Optional`、`Any` 等类型命名空间；
-- Agent 节点运行时不再因为 Pydantic 模型未重建而失败。
-
-### 2.3 已支持 Dify 工具调用
-
-目标之一是让该 Agent Strategy 像 Dify 自带 Agent 策略一样可调用 Dify 工具，这一能力已经打通。
-
-当前行为：
-
-- Agent 节点的 `tools` 参数会进入策略；
-- 插件会把 Dify 已选择工具转换为模型可调用的工具定义；
-- 主循环里支持模型发起工具调用，并把结果继续喂回推理链路；
-- 因此该策略已经不是“只读 skill 指令”，而是“Skill + Dify Tools”的混合执行模式。
-
-### 2.4 已支持上传 Skill 包并在运行前安装
-
-已支持通过 Agent 节点的 `skill_packages` 参数上传 zip 技能包。
-
-当前能力：
-
-- 每次运行前可安装 zip 包中的一个或多个 Skill；
-- 安装来源使用 Dify 插件 storage；
-- 安装后可被本次运行加载进 Skill Registry；
-- 已提供一组内部 `skill_*` 工具用于访问已安装 Skill 包内容。
-
-当前内置的内部工具包括：
-
-- `skill_list_installed`
-- `skill_get_metadata`
-- `skill_list_files`
-- `skill_read_file`
-- `skill_run_command`
-
-说明：
-
-- `skill_run_command` 默认关闭；
-- 只有开启 `allow_skill_commands` 后，才允许在“已安装 skill 包目录”中执行白名单命令；
-- 这还不是“任意上下文直接运行脚本”，只是“受限地运行已安装 skill 包里的命令”。
-
-### 2.5 已支持服务端外部 Skills 目录
-
-已实现“插件继续读取包内置 skills，同时额外读取服务端外部目录”的能力。
-
-当前加载顺序：
-
-1. 插件内置 `skills/`
-2. `external_skills_dir` 指向的外部目录
-3. Dify storage 中安装的 skill 包
-4. Agent 节点 `custom_skills` YAML
-
-默认外部目录：
-
-```text
-/opt/dify-agent-skills
-```
-
-当前限制：
-
-- 只允许读取 `/opt/dify-agent-skills`、`/app/external-skills` 及其子目录；
-- 外部技能目录必须是一层一级子目录；
-- Skill 文件名必须严格为 `SKILL.md`；
-- 新增技能后只需往服务器目录增加 `<skill_name>/SKILL.md`，然后重新运行 Agent，不需要重新打包上传插件。
-
-### 2.6 已加入原生会话记忆能力
-
-该 Agent Strategy 之前没有记忆能力，现在已经接入了 Dify 原生历史消息。
-
-当前实现：
-
-- `strategies/skill_agent.yaml` 中声明了 `features: history-messages`
-- 新增参数 `history_turns`，默认值为 `10`
-- 运行时通过 `_prepare_history_messages(...)` 把最近若干轮历史消息注入模型上下文
-
-当前效果：
-
-- Agent 能看到最近的 Dify 会话历史；
-- 调试模式下会输出类似 `Memory: loaded X turn(s), Y message(s).`
-
-### 2.7 已加入语义技能匹配兜底
-
-当前命中策略已经不是纯触发词匹配。
-
-现有机制：
-
-1. 先执行 `triggers` 规则匹配；
-2. 若没有任何 trigger 命中，且 `semantic_skill_matching = true`，则调用所选模型做一次语义路由；
-3. 路由置信度低于 `0.55` 时不会激活；
-4. 最多激活 `max_active_skills` 个技能。
-
-当前语义路由读取的主要元数据包括：
-
-- `name`
-- `description`
-- `category`
-- `triggers`
-- `priority`
-- `source`
-
-### 2.8 已修复“你有什么 skills”场景下的空列表表述问题
-
-此前模型可能只检查“安装包技能”，然后错误回答“没有任何 skills”。
-
-现在的处理：
-
-- 系统提示中会注入完整 Skill Inventory；
-- 包含内置、外部、已安装、以及运行时注册的技能来源；
-- 当用户询问“有哪些技能”时，要求模型从该 Inventory 回答，而不是说技能为空。
-
-### 2.9 已补充 Skill 设计规范文档
-
-已新增：
-
-- `SKILL_DESIGN_SPEC.md`
-
-该文档已覆盖：
-
-- Skill 加载顺序
-- Trigger 匹配规则
-- 语义兜底机制
-- `SKILL.md` / `config.yaml` 规范
-- 外部目录结构约束
-- 测试方法
-- 发布检查表
-
-它已经可以作为后续设计新 Skill 的基线规范。
-
-## 3. 当前服务器与部署信息
-
-### 3.1 登录信息
-
-- 服务器地址：`103.236.97.248`
-- SSH 端口：`54867`
-- 用户名：`root`
-- 密码：不写入仓库，请从安全凭据存储读取
-
-Linux / macOS / OpenSSH 直接登录：
-
-```bash
-ssh root@103.236.97.248 -p 54867
-```
-
-Windows 下可用 PowerShell 自带 `ssh`，或使用 PuTTY 的 `plink.exe`：
-
-```powershell
-"D:\Program Files\plink.exe" -P 54867 root@103.236.97.248
-```
-
-已知主机指纹：
-
-```text
-SHA256:8h23c4MCUC6rV0Yuxeatq5ZuPDtryFD8aSHli3ycC3s
-```
-
-说明：
-
-- 之前排查过 SSH 公钥与密码登录问题；
-- 当前实际可用端口是 `54867`，不是默认 `22`；
-- 当前部署环境支持密码登录；推荐迁移到 SSH 密钥并关闭 root 密码直登。
-
-### 3.2 服务器上的 Dify 位置
-
-- Dify 部署目录：`/opt/dify`
-- 外部 Skill 目录：`/opt/dify-agent-skills`
-- 需要挂载外部 Skill 的服务：`plugin_daemon`
-
-建议的 volume 挂载：
-
-```yaml
-volumes:
-  - /opt/dify-agent-skills:/opt/dify-agent-skills:ro
-```
-
-### 3.3 当前已知的 Dify 插件租户与插件标识
-
-当前安装信息（2026-06-18 升级后）：
-
-- 租户 ID：`b91f2ed2-e431-4b0a-afeb-0633d3a715f5`
-- 已安装插件：`local/agent-skill-plugin-plus:1.5.0@e9e6ee6ccd4eb04a01eb388709aac6bb17450deff0a86f91a76a7795a2892689`
-
-服务端当前部署版本是 `1.5.0`，插件运行实例已正常启动。
-
-## 4. 当前推荐的部署 / 升级方式
-
-### 4.1 本地打包
-
-需要在插件目录的父目录执行：
-
-```powershell
-cd E:\vibecoding
-C:\Users\ASUS\.local\bin\dify.exe plugin package ./skill-create
-```
-
-### 4.2 上传到服务器
-
-可使用 `pscp.exe` 上传生成的 `.difypkg`：
-
-```powershell
-"D:\Program Files\pscp.exe" -P 54867 .\agent-skill-plugin-plus-<version>.difypkg root@103.236.97.248:/opt/dify/
-```
-
-### 4.3 进入容器并执行升级
-
-已知可行流程：
-
-1. 把宿主机 `.difypkg` 复制进 `dify-api-1` 容器；
-2. 在容器内调用 Dify 官方 `PluginInstaller` 升级插件；
-3. 按租户 ID 对现有插件执行 `upgrade_plugin(...)`；
-4. 等待任务完成后清理临时包文件。
-
-这套流程之前已经成功用于从旧版本升级到 `1.3.0`、`1.4.0`。
-
-## 5. 当前未完成的点
-
-以下是现在还没有真正做完、也是下一阶段最关键的工作。
-
-### 5.1 通用运行时工作区脚本执行已部署
-
-本地 1.5.0 已实现：
-
-- 每次 Agent 调用创建独立临时工作区；
-- `runtime_write_file`、`runtime_read_file`、`runtime_list_files`；
-- `runtime_run_python` 与 `runtime_run_command`；
-- 命令白名单、1～300 秒超时、输出截断与相对路径约束；
-- 运行时执行默认关闭，需要显式开启 `allow_runtime_execution`。
-
-安全说明：
-
-- 该能力是进程级受控执行，不是容器或操作系统级强沙箱；
-- 生产环境仍应使用最小命令白名单，并限制插件容器权限。
-
-### 5.2 生成文件 Blob / 附件返回已部署
-
-本地实现包括：
-
-- `runtime_export_file` 显式导出；
-- `auto_export_files` 自动扫描常见交付文件；
-- 通过 `create_blob_message(...)` 返回真实文件；
-- DOCX、XLSX、PPTX、PDF 等 MIME 类型识别；
-- 单文件大小限制与最多自动导出 10 个文件；
-- 新增 `python-docx`、`openpyxl`、`python-pptx`、`reportlab` 运行依赖。
-
-### 5.3 技能语义匹配已支持连续上下文
-
-本地 1.5.0 会在语义路由前读取最近历史消息，并把“最近会话 + 当前 query”联合送入 `_semantic_match_skills(...)`。主模型上下文和技能路由使用同一组 `history_turns` 范围。
-
-### 5.4 内置 Skills 的语义元数据已加强
-
-已改写 `docs-helper`、`code-helper`、`testing-helper` 的中英文描述和触发词，并为文档生成、文件导出、内容填充、代码执行与测试运行补充了明确行为指令。
-
-### 5.5 1.5.0 已打包并部署
-
-围绕“直接运行脚本 + 返回文件 + 上下文语义匹配增强”的改动，已形成本地 `1.5.0`，并完成打包：
-
-```text
-E:\vibecoding\agent-skill-plugin-plus-1.5.0.difypkg
-```
-
-该包已确认不包含 `TECHNICAL_STATUS.md`、测试目录、示例目录和未接线草稿文件，并已部署到服务器。升级任务状态为 `success`，插件守护进程日志显示运行实例 `ready`。
-
-下一步：
-
-- 在 Dify 工作流中做一次完整冒烟测试
-
-建议最少验证以下场景：
-
-1. 用户问“你有什么 skills”
-2. 用户问“OSI 模型是什么”
-3. 用户先说“帮我生成一个 docx”
-4. 用户下一轮只说“就填入111”
-5. Agent 能调用工具或脚本生成真实文件
-6. 文件能作为附件/Blob 返回
-
-## 6. 当前代码状态的补充说明
-
-### 6.1 已接线文件
-
-当前真正参与插件运行链路的关键文件：
+- 当前阶段结论：
+  - 代码、skills、chatflow、部署产物和线上应用切换均已完成
+  - Dify 应用已切换到最新 published workflow，切换后的全量线上冒烟已通过
+  - 当前仅剩将已验证版本同步并发布到 GitHub
+
+当前关键文件与目录：
 
 - `manifest.yaml`
 - `provider/agent_skill.yaml`
 - `strategies/skill_agent.yaml`
 - `strategies/skill_agent.py`
 - `skills/`
-- `skills/package_store.py`
+- `examples/external-skills/`
+- `scripts/build_jw_skill_chatflow.py`
+- `chatflows/JW-SkillAgent-Pro-1.5.4.yml`
+- `tests/`
 
-### 6.2 当前本地存在但未接入 manifest 的草稿文件
+说明：
 
-本地还存在以下新增文件：
+- 当前仓库是持续开发中的工作区，不是干净发布分支
+- 仓库中存在用户自己的未提交改动，处理时应避免覆盖无关更改
 
-- `provider/skill_manager.py`
-- `provider/skill_manager.yaml`
-- `tools/skill_manager.py`
-- `tools/skill_manager.yaml`
+## 2. 已完成能力
 
-现状说明：
+### 2.1 插件打包与安装链路已稳定
 
-- 这些文件当前没有挂进 `manifest.yaml`
-- 因此它们不是当前已部署插件的生效能力
-- 可视为本地实验性草稿或后续扩展点
+此前出现过：
 
-## 7. 建议的下一步执行顺序
+```text
+agent_strategy and tool, model, endpoint, trigger, or datasource cannot be provided at the same time
+```
 
-建议按下面顺序继续推进：
+现在已修复：
 
-1. [已完成] 在 `strategies/skill_agent.py` 中加入“运行时工作区”能力；
-2. [已完成] 新增直接执行 Python / 脚本、写文件、列文件、导出文件的内部工具；
-3. [已完成] 把技能语义路由改为“当前 query + 最近历史上下文”联合判断；
-4. [已完成] 改造内置 skills 的中文描述、触发词和文档生成指令；
-5. [已完成] 升级本地版本号到 `1.5.0`；
-6. [已完成] 打包 `agent-skill-plugin-plus-1.5.0.difypkg`；
-7. [已完成] 部署到生产服务器；
-8. [待执行] 在 Dify 工作流中以“生成 docx 并返回附件”为核心用例做业务验收。
+- 插件被固定为纯 `agent strategy` 类型
+- `manifest.yaml` 不再混入 `tool`、`model`、`endpoint` 等异类能力
+- 已可正常打包为 `.difypkg`
+- 已可在 Dify 中成功升级安装
+
+### 2.2 Agent 已支持 Skill + Dify Tools 混合执行
+
+当前策略不再只是“读技能提示词”，而是已支持完整工具调用链路：
+
+- Agent 节点中选择的 Dify tools 会进入策略
+- 插件会把已选工具转换为模型可调用定义
+- 主循环支持模型发起 tool call，并把工具结果继续送回推理上下文
+- 因此当前策略已经是“Skill 路由 + Dify Tools 调用”的混合执行模式
+
+### 2.3 外部 Skills、安装包 Skills、运行时 Skills 已打通
+
+当前支持的 Skill 来源：
+
+1. 插件内置 `skills/`
+2. 服务端外部目录 `external_skills_dir`
+3. Dify storage 中安装的 skill 包
+4. Agent 节点 `custom_skills` YAML
+
+默认服务端外部目录：
+
+```text
+/opt/dify-agent-skills
+```
+
+当前服务端外部 skills 已上传并生效，服务器上共有 11 个 external skills。
+
+### 2.4 原生会话历史与百炼持久化记忆已接入
+
+已完成两层记忆能力：
+
+- Dify 原生会话历史消息注入
+- 百炼持久化记忆工具接入
+
+已经修复过的关键问题：
+
+```text
+DocumentPromptMessageContent is not JSON serializable
+```
+
+当前结论：
+
+- live smoke 中不再出现该序列化报错
+- 记忆工具的 `user_id` 已统一改为真正的 `sys.user_id` 变量选择器
+- 跨轮次、跨会话记忆读写在 smoke 中已观察到正常行为
+
+### 2.5 技能匹配已支持触发词 + 语义兜底 + 连续上下文
+
+当前技能命中机制：
+
+1. 先走 `triggers` 规则匹配
+2. 未命中时走语义匹配
+3. 语义匹配时会结合最近历史消息与当前 query 联合判断
+4. 低于阈值时不激活
+5. 最多激活 `max_active_skills` 个技能
+
+当前已验证技能路由相关行为：
+
+- 问候类请求会命中专门问候 skill
+- 学习建议类请求会进入学习教练类 skill
+- 网络概念解释、题目分析、题目生成等可分别落到相应 skills
+
+### 2.6 运行时工作区与文件导出能力已完成
+
+本地已实现并通过测试的运行时能力包括：
+
+- 独立临时工作区
+- `runtime_write_file`
+- `runtime_read_file`
+- `runtime_list_files`
+- `runtime_run_python`
+- `runtime_run_command`
+- `runtime_export_file`
+- `auto_export_files`
+
+当前行为：
+
+- 可生成真实 DOCX、XLSX、PPTX、PDF 等文件
+- 可通过 Blob / 附件方式返回给前端
+- 已包含命令白名单、超时、输出截断、相对路径约束等基础安全控制
+
+### 2.7 知识库引用展示已优化
+
+针对知识库回答场景，已完成以下优化：
+
+- 回复中保留精确 `document_name`
+- 标注更明确的页码信息
+- 优先使用来源整页图片，而不是只展示插图
+- 支持在回答中给出更清晰的来源指向，便于用户自己回看原文
+
+当前 smoke 中已验证：
+
+- 引用结果里能保留精确文件名
+- 能看到页码信息
+- 能看到整页图 URL
+
+### 2.8 学习路线已改为 Mermaid
+
+此前路线图使用纯文本，现已改为 Mermaid 代码块输出。
+
+已验证结论：
+
+- 前端可以正常渲染 Mermaid
+- 浏览器侧验证结果显示已生成 SVG
+- 未出现把原始代码块直接裸露给用户的情况
+
+### 2.9 Besti 公文格式 Word 生成已补强
+
+已完成：
+
+- 严格按 Besti 公文格式约束生成 Word
+- 表格默认作为附件放置
+- 图片默认作为附件放置
+- 允许显式指定放入正文
+- 自动生成附件列表
+- 优化签名、日期、分页、图片段落，修复图片被裁切问题
+
+已完成的可视化验证：
+
+- 样例 DOCX 已导出为 PDF
+- 已逐页渲染为 PNG 检查版式
+- 当前样例的正文、附件表格、附件图片分页表现正常
+
+### 2.10 新工具与新 Skills 已进入最终 DSL
+
+最终 chatflow DSL 中已包含以下 9 个工具：
+
+- `getKonwledgeBase`
+- `list_memory`
+- `add_memory`
+- `update_memory`
+- `anspire_search`
+- `anspire_crawl`
+- `text2image`
+- `bilibili_search`
+- `bilibili_get_video_info`
+
+新增和补充的外部 skills 已包括：
+
+- `network-greeting`
+- `network-learning-coach`
+- `network-problem-solver`
+- `network-question-analyzer`
+- `network-question-generator`
+- `network-scope-guide`
+- `network-learning-media`
+- `network-visual-explainer`
+- `besti-document-writer`
+
+## 3. 测试与产物状态
+
+### 3.1 本地测试状态
+
+- 单元测试：14 个通过
+- `ruff`：通过
+- external skills quick validate：11 个通过
+- chatflow DSL 最终校验：通过
+
+### 3.2 关键产物
+
+最终 chatflow DSL：
+
+- `E:\vibecoding\skill-create\chatflows\JW-SkillAgent-Pro-1.5.4.yml`
+
+清爽插件包：
+
+- `E:\vibecoding\skill-create\dist\agent-skill-plugin-plus-1.5.4-clean.difypkg`
+
+live smoke 结果：
+
+- `E:\vibecoding\skill-create\tmp\skill-agent-pro-1.5.4-live-smoke.json`
+- `E:\vibecoding\skill-create\tmp\skill-agent-pro-1.5.4-tool-smoke.json`
+- `E:\vibecoding\skill-create\tmp\skill-agent-pro-1.5.4-post-switch-smoke.json`
+
+Besti 样例文档：
+
+- `E:\vibecoding\skill-create\tmp\besti-sample-v154\Besti格式样例-1.5.4.docx`
+
+## 4. 服务器与线上部署状态
+
+### 4.1 登录与部署位置
+
+- 服务器地址：`103.236.97.248`
+- SSH 端口：`54867`
+- 用户名：`root`
+- Dify 部署目录：`/opt/dify`
+- 外部 Skill 目录：`/opt/dify-agent-skills`
+
+说明：
+
+- 当前实际可用端口是 `54867`
+- 建议优先使用 SSH 密钥而不是密码直登
+- 生产凭据不应写入仓库
+
+### 4.2 当前 Dify 相关标识
+
+- tenant id：`b91f2ed2-e431-4b0a-afeb-0633d3a715f5`
+- app id：`a7d68723-da54-45e3-a742-d746f4f852c7`
+- 公开聊天地址：`https://dify.jasonsome.cn:22380/chat/qAwvMQu4ziP5PCai`
+
+### 4.3 已安装插件版本
+
+当前已安装插件：
+
+```text
+local/agent-skill-plugin-plus:1.5.4@debd5e0137308c5ce5a24bac962e86ecfd6e9dfe656a1e8aa7008f1f808c505e
+```
+
+当前结论：
+
+- 插件安装任务已成功
+- plugin daemon 日志已出现实例 ready
+- 外部 skills 已上传到服务器
+
+### 4.4 已发布 workflow
+
+已知 workflow 状态：
+
+- 当前线上实际运行的新 workflow：`08dfb052-a20e-4e15-bbb3-21880fffb1f0`
+- 已下线的旧 workflow：`0d613718-d2e3-4e9d-8b98-116b06eb8072`
+- 旧 published workflow：`39702c3f-8ed6-44a9-b9aa-2eb9ca72a0cf`
+- draft workflow：`8e07a0b5-4305-4857-8270-02d96b293e5d`
+
+## 5. 已解决的线上阻塞点
+
+此前应用入口仍指向旧 workflow，现已解决。
+
+### 5.1 根因确认
+
+2026-06-19 线上数据库核查确认，app：
+
+```text
+a7d68723-da54-45e3-a742-d746f4f852c7
+```
+
+当时的 `apps.workflow_id` 确实仍为：
+
+```text
+0d613718-d2e3-4e9d-8b98-116b06eb8072
+```
+
+### 5.2 修复结果
+
+已通过带旧值条件的数据库事务，将应用指针切换为：
+
+```text
+08dfb052-a20e-4e15-bbb3-21880fffb1f0
+```
+
+事务更新 1 行，回读结果与目标值一致。
+
+### 5.3 切换后线上冒烟结果
+
+新增可复用脚本：
+
+- `scripts/live_smoke.py`
+
+脚本仅从 `DIFY_API_KEY` 环境变量读取凭据，不在仓库中保存密钥。
+
+切换后共执行 6 次 Service API 运行，全部满足：
+
+- HTTP 状态均为 200
+- workflow run 状态均为 `succeeded`
+- 6 次运行的 `workflow_id` 均为 `08dfb052-a20e-4e15-bbb3-21880fffb1f0`
+- 百炼持久化记忆可在全新会话中读回唯一验证暗号
+- Bilibili 搜索返回真实视频结果和链接
+- 文生图返回真实图片文件 URL
+- Mermaid 路线图返回可渲染的 `mermaid` 代码块
+- 知识库引用保留完整 PDF 文件名、页码和来源整页图
+- plugin daemon 日志出现真实 `/dispatch/tool/invoke`
+- 冒烟使用的临时 Service API Token 已删除，应用剩余 API Token 数量为 0
+
+## 6. 仍需完成的事项
+
+### 6.1 同步到 GitHub 新项目
+
+1. 将当前项目同步到 `E:\vibecoding\skill-agent-pro`
+2. 建立或完善 GitHub 仓库 `skill-agent-pro`
+3. 提交并推送当前可用版本
+
+当前本机 `gh` CLI 已安装，但尚未登录 GitHub。推送或创建 PR 前需要完成：
+
+```powershell
+gh auth login
+```
+
+## 7. 当前建议的执行顺序
+
+1. 同步当前已验证快照到 `E:\vibecoding\skill-agent-pro`
+2. 运行单元测试、`ruff`、external skills 校验和 chatflow DSL 校验
+3. 登录 GitHub CLI
+4. 提交、推送并创建发布 PR
 
 ## 8. 结论
 
-截至当前，插件已经完成了以下核心跨越：
-
-- 从“纯 Skill 策略”升级为“Skill + Dify Tools”策略；
-- 支持服务端外部 Skills 热加载；
-- 支持上传 zip Skill 包并在运行前安装；
-- 支持原生历史记忆；
-- 支持 trigger + 语义兜底匹配；
-- 已形成一份可复用的 Skill 设计规范。
-
-1.5.0 已补齐并部署“受控运行时执行、真实文件附件返回、连续上下文技能路由”三条主链路。当前仅剩 Dify 工作流中的端到端业务验收。
+截至 2026-06-19，`1.5.4` 本地代码、外部 skills、最终 chatflow DSL、插件安装、应用 workflow 切换和切换后线上冒烟均已完成。线上 6 次验证全部由最新 published workflow 执行成功，Bilibili、文生图、百炼持久化记忆、Mermaid 和知识库页图均已确认正常。当前仅剩 GitHub 同步、提交与推送。
