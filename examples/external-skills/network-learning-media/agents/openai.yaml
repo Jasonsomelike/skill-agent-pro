@@ -1,0 +1,4 @@
+interface:
+  display_name: "网络学习视频推荐"
+  short_description: "搜索、核验并推荐高相关度且适合当前阶段的计算机网络学习视频资源"
+  default_prompt: "为当前学习主题推荐可靠的 Bilibili 视频，并说明推荐理由。"

@@ -1,0 +1,13 @@
+triggers:
+  - B站视频
+  - Bilibili视频
+  - 哔哩哔哩视频
+  - 推荐视频
+  - 学习视频
+  - 教学视频
+  - 视频课程
+  - 有什么视频
+  - 看什么视频
+  - 视频讲解
+priority: 14
+category: education

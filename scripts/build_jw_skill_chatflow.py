@@ -10,8 +10,8 @@ import yaml
 
 
 LOCAL_PLUGIN = (
-    "local/agent-skill-plugin-plus:1.5.3@"
-    "59585d776901ad3ac11835dab6d8f267c31d26f5e08219e3e32aad0503c2afa5"
+    "local/agent-skill-plugin-plus:1.5.4@"
+    "debd5e0137308c5ce5a24bac962e86ecfd6e9dfe656a1e8aa7008f1f808c505e"
 )
 DEEPSEEK_PLUGIN = (
     "langgenius/deepseek:0.0.15@"
@@ -29,6 +29,14 @@ BAILIAN_MEMORY_PLUGIN = (
     "langgenius/bailian_memory:0.0.7@"
     "129745df48663b5d877417ccc89d9f370cdc4cc0a4dabba4b1b62da129995819"
 )
+SEEDREAM_PLUGIN = (
+    "sawyer-shi/seedream_aigc:0.0.2@"
+    "2596bbe3303083a61f681f93ad7937f2acd646e791f8821225e13f91a2fdd150"
+)
+BILIBILI_PLUGIN = (
+    "jingfelix/bilibili_search:0.0.3@"
+    "65a5d46003869c29098bbc3b5c03b93a17102649f29138bc035a8d07ac9a0700"
+)
 
 START_ID = "1711528708197"
 FILE_BRANCH_ID = "1780798147131"
@@ -41,12 +49,13 @@ ANSWER_ID = "1780668375718"
 
 def dependency(plugin_identifier: str, *, local_package: bool = False) -> dict:
     if local_package:
+        version = plugin_identifier.split(":", 1)[1].split("@", 1)[0]
         return {
             "current_identifier": None,
             "type": "package",
             "value": {
                 "plugin_unique_identifier": plugin_identifier,
-                "version": "1.5.3",
+                "version": version,
             },
         }
     return {
@@ -105,8 +114,7 @@ def configure_memory_tool(tool: dict) -> dict:
     if name == "list_memory":
         params["page_num"] = manual_constant(1)
         params["page_size"] = manual_constant(50)
-        params["user_id"] = manual_variable(["sys", "user_id"])
-    elif name in {"add_memory", "update_memory"}:
+    if "user_id" in params or name in {"list_memory", "add_memory", "update_memory"}:
         params["user_id"] = manual_variable(["sys", "user_id"])
     return tool
 
@@ -116,13 +124,18 @@ def find_node(nodes: list[dict], node_id: str) -> dict:
 
 
 def load_tools(nodes: list[dict]) -> list[dict]:
-    main_agent = next(node for node in nodes if node["id"] == AGENT_ID)
-    memory_agent = next(node for node in nodes if node["id"] == "1781090448061")
     available = {}
-    for tool in main_agent["data"]["agent_parameters"]["tools"]["value"]:
-        available[tool["tool_name"]] = tool
-    for tool in memory_agent["data"]["agent_parameters"]["tools"]["value"]:
-        available[tool["tool_name"]] = tool
+    for node in nodes:
+        if node.get("data", {}).get("type") != "agent":
+            continue
+        tools = (
+            node.get("data", {})
+            .get("agent_parameters", {})
+            .get("tools", {})
+            .get("value", [])
+        )
+        for tool in tools:
+            available[tool["tool_name"]] = tool
 
     selected_names = [
         "getKonwledgeBase",
@@ -131,6 +144,9 @@ def load_tools(nodes: list[dict]) -> list[dict]:
         "update_memory",
         "anspire_search",
         "anspire_crawl",
+        "text2image",
+        "bilibili_search",
+        "bilibili_get_video_info",
     ]
     missing = [name for name in selected_names if name not in available]
     if missing:
@@ -195,7 +211,10 @@ def build_agent_node(source_nodes: list[dict]) -> dict:
         "agent_strategy_label": "Skill-based Agent",
         "agent_strategy_name": "skill_agent",
         "agent_strategy_provider_name": "local/agent-skill-plugin-plus/agent_skill_provider",
-        "desc": "由外部 Skills 路由问候、教学、解题、批改、出题、学习建议与边界处理。",
+        "desc": (
+            "由 Skills 路由教学、解题、记忆、Mermaid 学习路线、Bilibili 视频推荐、"
+            "教学配图与 Besti Word 公文生成。"
+        ),
         "memory": {
             "query_prompt_template": "{{#sys.query#}}\n\n{{#sys.files#}}",
             "window": {
@@ -205,7 +224,7 @@ def build_agent_node(source_nodes: list[dict]) -> dict:
         },
             "meta": {
                 "minimum_dify_version": "1.7.0",
-                "version": "1.5.3",
+                "version": "1.5.4",
             },
         "output_schema": {},
         "plugin_unique_identifier": LOCAL_PLUGIN,
@@ -261,6 +280,8 @@ def build(source: dict) -> dict:
         dependency(TONGYI_PLUGIN),
         dependency(ANSPIRE_PLUGIN),
         dependency(BAILIAN_MEMORY_PLUGIN),
+        dependency(SEEDREAM_PLUGIN, local_package=True),
+        dependency(BILIBILI_PLUGIN, local_package=True),
     ]
 
     workflow = result["workflow"]

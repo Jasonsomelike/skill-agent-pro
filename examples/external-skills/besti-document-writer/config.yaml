@@ -1,0 +1,15 @@
+triggers:
+  - Besti公文
+  - 公文格式
+  - 生成Word
+  - 生成word文档
+  - 生成DOCX
+  - Word文档
+  - docx文档
+  - 写请示
+  - 写通知
+  - 写策划书
+  - 会议纪要
+  - 正式公文
+priority: 20
+category: documentation
